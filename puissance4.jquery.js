@@ -188,6 +188,8 @@ class Connect4Game {
         this.board = new GameBoard(this, 7, 6);
         this.matchState = new MatchState();
         this.players = [];
+        this.state = "none";
+        this.winner = null;
 
         this.setupPlayers();
         this.setupEvents();
@@ -195,6 +197,8 @@ class Connect4Game {
 
     start() {
         this.matchState.currentPlayerId = 0;
+        this.state = "gameplay";
+        this.winner = null;
         this.render();
     }
 
@@ -218,17 +222,120 @@ class Connect4Game {
     }
 
     render() {
-        this.board.render(this.canvas[0]);
+        if (this.state === "gameplay")
+            this.board.render(this.canvas[0]);
+        else if (this.state === "result")
+            this.renderResultScreen(this.canvas[0]);
+    }
+
+    /**
+     * @param {HTMLCanvasElement} canvas 
+     */
+    renderResultScreen(canvas) {
+        let context = canvas.getContext('2d');
+        context.fillStyle = "black";
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.font = "30px Arial";
+        context.fillStyle = "white";
+
+        let text = (this.winner === null)
+            ? "DRAW"
+            : "PLAYER " + this.winner.playerId + " WINS";
+
+        context.fillText(text, 150, (canvas.height / 2) - 30);
     }
 
     getCurrentPlayer() {
         return this.players[this.matchState.currentPlayerId];
     }
 
+    isEveryCellFilled() {
+        for (let iRow = 0; iRow < this.board.numCellsY; ++iRow) {
+            for (let iCol = 0; iCol < this.board.numCellsX; ++iCol) {
+                let cell = this.board.getCell(iRow, iCol);
+                if (cell.ownerPlayer === null)
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    findWinningCombination(cellRow, cellCol) {
+        let gameBoard = this.board;
+        let originCell = gameBoard.getCell(cellRow, cellCol);
+        
+        if (originCell.ownerPlayer === null)
+            return null;
+
+        let collectionPlayer = originCell.ownerPlayer;
+
+        // Origin to Left
+        for(let iCol = cellCol, comboCounter = 1; iCol >= 0; --iCol) {
+            if(this.board.getCell(cellRow, iCol).ownerPlayer !== collectionPlayer)
+                break;
+            else if ((++comboCounter) > 4)
+                return collectionPlayer;
+        }
+
+        // Origin to Right
+        for(let iCol = cellCol, comboCounter = 1; iCol < gameBoard.numCellsX; ++iCol) {
+            if(this.board.getCell(cellRow, iCol).ownerPlayer !== collectionPlayer)
+                break;
+            else if ((++comboCounter) > 4)
+                return collectionPlayer;
+        }
+
+        // Origin to Bottom
+        for(let iRow = cellRow, comboCounter = 1; iRow < gameBoard.numCellsY; ++iRow) {
+            if(this.board.getCell(iRow, cellCol).ownerPlayer !== collectionPlayer)
+                break;
+            else if ((++comboCounter) > 4)
+                return collectionPlayer;
+        }
+
+        /*
+        ======= NOT WORKING FOR NOW ==============
+        ==========================================
+
+        // Origin to Bottom-Left
+        for(let iRow = cellRow, iCol = cellCol, comboCounter = 1; iRow >= 0 && iCol >= 0; --iRow, --iCol) {
+            if(this.board.getCell(iRow, iCol).ownerPlayer !== collectionPlayer)
+                break;
+            else if ((++comboCounter) > 4)
+                return collectionPlayer;
+        }
+
+        // Origin to Top-Right
+        for(let iRow = cellRow, iCol = cellCol, comboCounter = 1; iRow < gameBoard.numCellsY && iCol < gameBoard.numCellsX; ++iRow, ++iCol) {
+            if(this.board.getCell(iRow, iCol).ownerPlayer !== collectionPlayer)
+                break;
+            else if ((++comboCounter) > 4)
+                return collectionPlayer;
+        }
+        */
+       
+        return null;
+    }
+
+    /**
+     * @param {GameBoardCell} cell 
+     */
+    checkWinnerAtPos(cell) {        
+        let w = this.findWinningCombination(cell.posY, cell.posX);
+        if (w !== null) {
+            this.winner = w;
+            this.state = "result";
+            this.render();
+        }
+    }
+
     /**
      * @param {MouseEvent} event
      */
     onCanvasHover(event) {
+        if (this.state !== "gameplay")
+            return false;
         if (this.matchState.currentPlayerId === null)
             return false;
 
@@ -262,6 +369,9 @@ class Connect4Game {
      * @param {MouseEvent} event
      */
     onCanvasClick(event) {
+        if (this.state !== "gameplay")
+            return false;
+
         let matchState = this.matchState;
         if (matchState.currentPlayerId === null)
             return false;
@@ -284,5 +394,7 @@ class Connect4Game {
 
         this.board.currentHintedCell = this.board.getAvailableCellInColumn(column);
         this.render();
+
+        this.checkWinnerAtPos(cell);
     }
 }
