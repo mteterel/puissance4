@@ -5,8 +5,8 @@ $.fn.puissance4 = function (settings)
     game.start();
 };
 
-var c_cellSize = 80; // in px
-var c_spacing = 10; // in px
+var c_cellSize = 80;
+var c_spacing = 10;
 var c_arrowSize = 15;
 var c_gridBackgroundColor = '#007fff';
 
@@ -37,14 +37,15 @@ class GameBoardCell {
 
     getFillColor() {
         let board = this.ownerBoard;
-        let hovered = board.currentHoveredColumn === this.posX;
+        let game = board.ownerGame;
 
-        if (this.ownerPlayer === null)
-            return "white";
+        if (this.ownerPlayer !== null)
+            return this.ownerPlayer.color + "FF";
 
-        return this.ownerPlayer.playerId === 1
-            ? "red"
-            : "yellow";
+        if (this.ownerBoard.currentHintedCell === this)
+            return game.getCurrentPlayer().color + "7F";
+
+        return "white";
     }
 
     getPosX2D() {
@@ -62,7 +63,7 @@ class GameBoardCell {
         let context = canvas.getContext('2d');
         context.fillStyle = this.getFillColor();
         context.beginPath();
-        context.arc(this.getPosX2D(), this.getPosY2D(),c_cellSize / 2, 0, 2 * Math.PI);
+        context.arc(this.getPosX2D(), this.getPosY2D(), c_cellSize / 2, 0, 2 * Math.PI);
         context.fill();
     }
 }
@@ -93,6 +94,53 @@ class GameBoard
      */
     getCell(iRow, iCol) {
         return this.cells[iRow][iCol];
+    }
+
+    /**
+     * @param {number} iCol 
+     */
+    getAvailableCellInColumn(iCol) {
+        let result = null;
+
+        for(let iRow = 0; iRow < this.numCellsY; ++iRow) {
+            let cell = this.cells[iRow][iCol];
+            if (cell.ownerPlayer === null)
+                result = cell;
+        }
+        
+        return result;
+    }
+
+    getCellAtPos2D(x, y) {
+        for (let iRow = 0; iRow < this.numCellsY; ++iRow) {
+            for (let iCol = 0; iCol < this.numCellsX; ++iCol) {
+                let cell = this.getCell(iRow, iCol);
+                let cellPosX = cell.getPosX2D() - (c_cellSize / 2);
+                let cellPosY = cell.getPosY2D() - (c_cellSize / 2);
+
+                if (cellPosX <= x
+                    && x <= cellPosX + c_cellSize
+                    && cellPosY <= y
+                    && y <= cellPosY + c_cellSize)
+                    return cell;
+            }
+        }
+
+        return null;
+    }
+
+    getColumnAtPos2D(x) {
+        for (let iRow = 0; iRow < this.numCellsY; ++iRow) {
+            for (let iCol = 0; iCol < this.numCellsX; ++iCol) {
+                let cell = this.getCell(iRow, iCol);
+                let cellPosX = cell.getPosX2D() - (c_cellSize / 2);
+
+                if (cellPosX <= x && x <= cellPosX + c_cellSize)
+                    return cell.posX;
+            }
+        }
+
+        return null;
     }
 
     drawArrow(context, iColumn) {
@@ -151,8 +199,8 @@ class Connect4Game {
     setupPlayers() {
         this.players = [];
 
-        let p1 = new PlayerInfo(1, "red");
-        let p2 = new PlayerInfo(2, "yellow");
+        let p1 = new PlayerInfo(1, "#FF0000");
+        let p2 = new PlayerInfo(2, "#FFFF00");
 
         this.players = [p1, p2];
     }
@@ -175,24 +223,6 @@ class Connect4Game {
         return this.players[this.matchState.currentPlayerId];
     }
 
-    getCellAtPos2D(x, y) {
-        for (let iRow = 0; iRow < this.board.numCellsY; ++iRow) {
-            for (let iCol = 0; iCol < this.board.numCellsX; ++iCol) {
-                let cell = this.board.getCell(iRow, iCol);
-                let cellPosX = cell.getPosX2D() - (c_cellSize / 2);
-                let cellPosY = cell.getPosY2D() - (c_cellSize / 2);
-
-                if (cellPosX <= x
-                    && x <= cellPosX + c_cellSize
-                    && cellPosY <= y
-                    && y <= cellPosY + c_cellSize)
-                    return cell;
-            }
-        }
-
-        return null;
-    }
-
     /**
      * @param {MouseEvent} event
      */
@@ -205,15 +235,14 @@ class Connect4Game {
         let shouldRedraw = false;
         let matchedAnything = false;
 
-        let cell = this.getCellAtPos2D(mouseLeft, mouseTop);
-
-        if (cell !== null)
+        let column = this.board.getColumnAtPos2D(mouseLeft, mouseTop);
+        if (column !== null)
         {
             matchedAnything = true;
 
-            let cellColumn = cell.posX;
-            if (this.board.currentHoveredColumn !== cellColumn) {
-                this.board.currentHoveredColumn = cellColumn;
+            if (this.board.currentHoveredColumn !== column) {
+                this.board.currentHoveredColumn = column;
+                this.board.currentHintedCell = this.board.getAvailableCellInColumn(column);
                 shouldRedraw = true;
             }
         }
@@ -231,21 +260,27 @@ class Connect4Game {
      * @param {MouseEvent} event
      */
     onCanvasClick(event) {
-        if (this.matchState.currentPlayerId === null)
+        let matchState = this.matchState;
+        if (matchState.currentPlayerId === null)
             return false;
 
-        let mouseLeft = event.pageX - this.canvas[0].offsetLeft;
-        let mouseTop = event.pageY - this.canvas[0].offsetTop;
+        let mouseLeft = event.pageX - this.canvas[0].offsetLeft;        
+        let board = this.board;
+        let column = board.getColumnAtPos2D(mouseLeft);
 
-        let cell = this.getCellAtPos2D(mouseLeft, mouseTop);
+        if (column === null)
+            return false;
+
+        let cell = board.getAvailableCellInColumn(column);
         if (cell === null || cell.ownerPlayer !== null)
             return false;
 
         cell.ownerPlayer = this.getCurrentPlayer();
-        let activePlayerId = this.matchState.currentPlayerId;
+        let activePlayerId = matchState.currentPlayerId;
         activePlayerId = (activePlayerId + 1) % this.players.length;
-        this.matchState.setCurrentPlayerId(activePlayerId);
+        matchState.setCurrentPlayerId(activePlayerId);
 
+        this.board.currentHintedCell = this.board.getAvailableCellInColumn(column);
         this.render();
     }
 }
