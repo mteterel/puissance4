@@ -61,9 +61,11 @@ class GameBoardCell {
      */
     render(canvas) {
         let context = canvas.getContext('2d');
-        context.fillStyle = this.getFillColor();
         context.beginPath();
         context.arc(this.getPosX2D(), this.getPosY2D(), c_cellSize / 2, 0, 2 * Math.PI);
+        context.fillStyle = "white";
+        context.fill();
+        context.fillStyle = this.getFillColor();
         context.fill();
     }
 }
