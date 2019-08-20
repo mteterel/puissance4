@@ -186,15 +186,9 @@ class GameBoard
 class Connect4Game {
     constructor(canvasElement, settings) {
         this.canvas = canvasElement;
-        this.board = new GameBoard(this, 7, 6);
-        this.matchState = new MatchState();
-        this.players = [];
         this.settings = settings;
-        this.state = "none";
-        this.winner = null;
-
-        this.setupPlayers();
-        this.setupEvents();
+        this.reset();
+        this.setupEvents();        
     }
 
     start() {
@@ -204,12 +198,21 @@ class Connect4Game {
         this.render();
     }
 
+    reset() {
+        this.board = new GameBoard(this, this.settings.columns || 7, this.settings.rows || 6);
+        this.matchState = new MatchState();
+        this.players = [];
+        this.state = "none";
+        this.winner = null;
+        this.setupPlayers();
+    }
+
     setupPlayers() {
         this.players = [];
-
         var self = this;
+
         this.settings.players.forEach(function(element, index) {
-            let newPlayer = new PlayerInfo(index, element.color, element.name || null)
+            let newPlayer = new PlayerInfo(index + 1, element.color, element.name || null)
             self.players.push(newPlayer);
         });
     }
@@ -221,6 +224,12 @@ class Connect4Game {
         });
         this.canvas.mousemove(function (e) {
             self.onCanvasHover(e);
+        });
+        $(document).keypress(function (e) {
+            if (self.state === "result") {
+                self.reset();
+                self.start();
+            }
         });
     }
 
@@ -337,7 +346,7 @@ class Connect4Game {
             this.render();
         }
     }
-
+    
     /**
      * @param {MouseEvent} event
      */
@@ -402,7 +411,7 @@ class Connect4Game {
 
         this.board.currentHintedCell = this.board.getAvailableCellInColumn(column);
         this.render();
-
+        
         this.checkWinnerAtPos(cell);
-    }
+    }   
 }

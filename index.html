@@ -7,7 +7,11 @@
 <body>
     <div id="form-wrapper">
         <form id="game-settings-form">
-            <fieldset id="players-list">        </fieldset>
+            <fieldset>
+                    <label>Number of columns: <input id="setting-num-cols" type="number" value="7"></label>
+                    <label>Number of rows: <input id="setting-num-rows" type="number" value="6"></label>
+            </fieldset>
+            <fieldset id="players-list"></fieldset>
             <button id="add-player" type="button">Add another player</button>
             <button type="submit">Submit</button>
         </form>
@@ -49,14 +53,16 @@
         console.log(players);
 
         $('#game-app').puissance4({
-            columns: 7,
-            rows: 6,
+            columns: $("#setting-num-cols").val(),
+            rows: $("#setting-num-rows").val(),
             players: players
         });
     });
 
     appendNewPlayerHTML();
     appendNewPlayerHTML();
+    $('.player-name:eq(0)').val('Test 1');
+    $('.player-name:eq(1)').val('Test 2');
     $('.player-color:eq(0)').val('#FF0000');
     $('.player-color:eq(1)').val('#FFFF00');
 </script>
