@@ -5,11 +5,60 @@
     <title>Puissance 4</title>
 </head>
 <body>
-<div id="game-app"></div>
+    <div id="form-wrapper">
+        <form id="game-settings-form">
+            <fieldset id="players-list">        </fieldset>
+            <button id="add-player" type="button">Add another player</button>
+            <button type="submit">Submit</button>
+        </form>
+    </div>
+    <div id="game-app"></div>
 <script src="jquery-3.4.1.slim.js"></script>
 <script src="puissance4.jquery.js"></script>
 <script>
-    $('#game-app').puissance4();
+    function appendNewPlayerHTML() {
+        $("#players-list").append(
+            $("<div class='setting-player-info'>").append(
+                "<input type='text' class='player-name'> " +
+                "<select class='player-color'>" +
+                    "<option value='#FF0000'>Red</option>" +
+                    "<option value='#FFFF00'>Yellow</option>" +
+                    "<option value='#FF00F0'>Magenta</option>" +
+                    "<option value='#00FF1B'>Green</option>" +
+                    "<option value='#FFAE00'>Orange</option>" +
+                "</select>"
+            )
+        );
+    }
+
+    $("#add-player").click(function() {
+        appendNewPlayerHTML();
+    });
+
+    $("#game-settings-form").submit(function(e) {
+        e.preventDefault();
+        $("#form-wrapper").hide();
+        var players = [];
+        $.each($('.setting-player-info'), function(index, value) {
+            players.push({
+                name: $(value).find('.player-name').val(),
+                color: $(value).find('.player-color').val()
+            });
+        });
+
+        console.log(players);
+
+        $('#game-app').puissance4({
+            columns: 7,
+            rows: 6,
+            players: players
+        });
+    });
+
+    appendNewPlayerHTML();
+    appendNewPlayerHTML();
+    $('.player-color:eq(0)').val('#FF0000');
+    $('.player-color:eq(1)').val('#FFFF00');
 </script>
 </body>
 </html>

@@ -11,9 +11,10 @@ var c_arrowSize = 15;
 var c_gridBackgroundColor = '#007fff';
 
 class PlayerInfo {
-    constructor(id, color) {
+    constructor(id, color, name = null) {
         this.playerId = id;
         this.color = color;
+        this.name = name;
     }
 }
 
@@ -188,6 +189,7 @@ class Connect4Game {
         this.board = new GameBoard(this, 7, 6);
         this.matchState = new MatchState();
         this.players = [];
+        this.settings = settings;
         this.state = "none";
         this.winner = null;
 
@@ -205,10 +207,11 @@ class Connect4Game {
     setupPlayers() {
         this.players = [];
 
-        let p1 = new PlayerInfo(1, "#FF0000");
-        let p2 = new PlayerInfo(2, "#FFFF00");
-
-        this.players = [p1, p2];
+        var self = this;
+        this.settings.players.forEach(function(element, index) {
+            let newPlayer = new PlayerInfo(index, element.color, element.name || null)
+            self.players.push(newPlayer);
+        });
     }
 
     setupEvents() {
@@ -239,10 +242,15 @@ class Connect4Game {
         context.font = "30px Arial";
         context.fillStyle = "white";
 
-        let text = (this.winner === null)
-            ? "DRAW"
-            : "PLAYER " + this.winner.playerId + " WINS";
+        let text = "DRAW";
 
+        if (this.winner !== null) {
+            let playerName = this.winner.name || "PLAYER " + this.winner.playerId;
+            text = playerName + " WINS !";
+        }
+
+        context.fillText("Press SPACE to play again", 150, (canvas.height - 30));
+        context.fillStyle = this.winner.color;
         context.fillText(text, 150, (canvas.height / 2) - 30);
     }
 
