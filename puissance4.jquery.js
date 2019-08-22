@@ -21,6 +21,7 @@ class PlayerInfo {
 class MatchState {
     constructor() {
         this.currentPlayerId = null;
+        this.lastPlayedCell = null;
     }
 
     setCurrentPlayerId(newPlayerId) {
@@ -163,6 +164,19 @@ class GameBoard
         context.fill();
     }
 
+    drawGameControls(context) {
+        context.font = "16px Arial";
+        
+        context.fillStyle = "white";
+        context.fillText("[R] = Restart", 120, 25);
+
+        context.fillStyle = this.ownerGame.matchState.lastPlayedCell === null ? "#333" : "white";
+        context.fillText("[Z] = Undo", 20, 25);
+
+        context.fillStyle = "cyan";
+        context.fillText(this.ownerGame.players[this.ownerGame.matchState.currentPlayerId].name + "'s turn", 300, 16);
+    }
+
     render(canvas) {
         canvas.height = ((c_cellSize + c_spacing) * this.numCellsY) + c_spacing + (c_arrowSize + c_spacing);
         canvas.width = ((c_cellSize + c_spacing) * this.numCellsX) + c_spacing;
@@ -180,6 +194,8 @@ class GameBoard
                 this.cells[iRow][iCol].render(canvas);
             }
         }
+
+        this.drawGameControls(context);
     }
 }
 
@@ -226,11 +242,30 @@ class Connect4Game {
             self.onCanvasHover(e);
         });
         $(document).keypress(function (e) {
-            if (self.state === "result") {
-                self.reset();
-                self.start();
-            }
+            if (self.state === "result" ||
+                (self.state === "gameplay" && e.key === "R"))
+                self.restartGame();
+            else if (self.state === "gameplay" && e.key === "Z")
+                self.undoLastMove();
         });
+    }
+
+    restartGame() {
+        this.reset();
+        this.start();
+    }
+
+    undoLastMove() {
+        if (this.matchState.lastPlayedCell !== null) {
+            this.matchState.lastPlayedCell.ownerPlayer = null;
+            this.matchState.lastPlayedCell = null;
+            let nextPlayer = (this.matchState.currentPlayerId - 1);
+            if (nextPlayer < 0)
+                nextPlayer = this.players.length - 1;
+            this.matchState.setCurrentPlayerId(nextPlayer % this.players.length);
+            this.board.currentHintedCell = null;
+            this.render();
+        }
     }
 
     render() {
@@ -250,17 +285,23 @@ class Connect4Game {
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.font = "30px Arial";
         context.fillStyle = "white";
+        context.fillText("Press SPACE to play again", 150, (canvas.height - 30));
 
         let text = "DRAW";
 
         if (this.winner !== null) {
             let playerName = this.winner.name || "PLAYER " + this.winner.playerId;
             text = playerName + " WINS !";
+            context.fillStyle = this.winner.color;
         }
 
-        context.fillText("Press SPACE to play again", 150, (canvas.height - 30));
-        context.fillStyle = this.winner.color;
         context.fillText(text, 150, (canvas.height / 2) - 30);
+    }
+
+    sendToResultScreen(winner) {
+        this.winner = winner;
+        this.state = "result";
+        this.render();
     }
 
     getCurrentPlayer() {
@@ -278,73 +319,37 @@ class Connect4Game {
         return true;
     }
 
-    findWinningCombination(cellRow, cellCol) {
-        let gameBoard = this.board;
-        let originCell = gameBoard.getCell(cellRow, cellCol);
-        
-        if (originCell.ownerPlayer === null)
-            return null;
-
-        let collectionPlayer = originCell.ownerPlayer;
-
-        // Origin to Left
-        for(let iCol = cellCol, comboCounter = 1; iCol >= 0; --iCol) {
-            if(this.board.getCell(cellRow, iCol).ownerPlayer !== collectionPlayer)
-                break;
-            else if ((++comboCounter) > 4)
-                return collectionPlayer;
-        }
-
-        // Origin to Right
-        for(let iCol = cellCol, comboCounter = 1; iCol < gameBoard.numCellsX; ++iCol) {
-            if(this.board.getCell(cellRow, iCol).ownerPlayer !== collectionPlayer)
-                break;
-            else if ((++comboCounter) > 4)
-                return collectionPlayer;
-        }
-
-        // Origin to Bottom
-        for(let iRow = cellRow, comboCounter = 1; iRow < gameBoard.numCellsY; ++iRow) {
-            if(this.board.getCell(iRow, cellCol).ownerPlayer !== collectionPlayer)
-                break;
-            else if ((++comboCounter) > 4)
-                return collectionPlayer;
-        }
-
-        /*
-        ======= NOT WORKING FOR NOW ==============
-        ==========================================
-
-        // Origin to Bottom-Left
-        for(let iRow = cellRow, iCol = cellCol, comboCounter = 1; iRow >= 0 && iCol >= 0; --iRow, --iCol) {
+    testWinningCombination(startX, startY, dirX, dirY, collectionPlayer) {
+        let comboCounter = 0;        
+        for(let iCol = startX, iRow = startY; iRow >= 0 && iCol >= 0 && iRow < this.board.numCellsY && iCol < this.board.numCellsX; iRow += dirY, iCol += dirX) {
             if(this.board.getCell(iRow, iCol).ownerPlayer !== collectionPlayer)
                 break;
-            else if ((++comboCounter) > 4)
-                return collectionPlayer;
+            else if (++comboCounter >= 4)
+                return true;
         }
-
-        // Origin to Top-Right
-        for(let iRow = cellRow, iCol = cellCol, comboCounter = 1; iRow < gameBoard.numCellsY && iCol < gameBoard.numCellsX; ++iRow, ++iCol) {
-            if(this.board.getCell(iRow, iCol).ownerPlayer !== collectionPlayer)
-                break;
-            else if ((++comboCounter) > 4)
-                return collectionPlayer;
-        }
-        */
-       
-        return null;
     }
 
-    /**
-     * @param {GameBoardCell} cell 
-     */
-    checkWinnerAtPos(cell) {        
-        let w = this.findWinningCombination(cell.posY, cell.posX);
-        if (w !== null) {
-            this.winner = w;
-            this.state = "result";
-            this.render();
+    findWinningCombination() {
+        for (let iRow = 0; iRow < this.board.numCellsY; ++iRow) {
+            for (let iCol = 0; iCol < this.board.numCellsX; ++iCol) {
+                let cell = this.board.getCell(iRow, iCol);
+                if (cell.ownerPlayer === null)
+                    continue;
+
+                let collectionPlayer = cell.ownerPlayer;
+                if (this.testWinningCombination(iCol, iRow, 1, 0, collectionPlayer) ||
+                    this.testWinningCombination(iCol, iRow, -1, 0, collectionPlayer) ||
+                    this.testWinningCombination(iCol, iRow, 0, 1, collectionPlayer) ||
+                    this.testWinningCombination(iCol, iRow, 0, -1, collectionPlayer) ||
+                    this.testWinningCombination(iCol, iRow, 1, 1, collectionPlayer) ||
+                    this.testWinningCombination(iCol, iRow, 1, -1, collectionPlayer) ||
+                    this.testWinningCombination(iCol, iRow, -1, 1, collectionPlayer) ||
+                    this.testWinningCombination(iCol, iRow, -1, -1, collectionPlayer))
+                    return collectionPlayer;
+            }
         }
+        
+        return null;
     }
     
     /**
@@ -405,13 +410,23 @@ class Connect4Game {
             return false;
 
         cell.ownerPlayer = this.getCurrentPlayer();
-        let activePlayerId = matchState.currentPlayerId;
-        activePlayerId = (activePlayerId + 1) % this.players.length;
-        matchState.setCurrentPlayerId(activePlayerId);
+        this.matchState.lastPlayedCell = cell;
 
-        this.board.currentHintedCell = this.board.getAvailableCellInColumn(column);
-        this.render();
-        
-        this.checkWinnerAtPos(cell);
-    }   
+        let winner = this.findWinningCombination();
+        if (winner !== null) {
+            this.sendToResultScreen(winner);
+        }
+        else if (this.isEveryCellFilled()) {
+            this.sendToResultScreen(null);
+        }
+        else
+        {
+            let activePlayerId = matchState.currentPlayerId;
+            activePlayerId = (activePlayerId + 1) % this.players.length;
+            matchState.setCurrentPlayerId(activePlayerId);
+
+            this.board.currentHintedCell = this.board.getAvailableCellInColumn(column);
+            this.render();
+        }
+    }
 }
