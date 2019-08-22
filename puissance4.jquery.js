@@ -8,6 +8,7 @@ $.fn.puissance4 = function (settings)
 var c_cellSize = 80;
 var c_spacing = 10;
 var c_arrowSize = 15;
+var c_topBarSize = 35;
 var c_gridBackgroundColor = '#007fff';
 
 class PlayerInfo {
@@ -15,6 +16,7 @@ class PlayerInfo {
         this.playerId = id;
         this.color = color;
         this.name = name;
+        this.score = 0;
     }
 }
 
@@ -55,7 +57,7 @@ class GameBoardCell {
     }
 
     getPosY2D() {
-        return (c_arrowSize + c_spacing) + c_spacing + (this.posY * (c_cellSize + c_spacing)) + (c_cellSize / 2);
+        return (c_arrowSize + c_spacing) + c_spacing + c_topBarSize + (this.posY * (c_cellSize + c_spacing)) + (c_cellSize / 2);
     }
 
     /**
@@ -155,10 +157,10 @@ class GameBoard
         context.strokeStyle = "black";
         context.fillStyle = activePlayer.color;
         context.beginPath();
-        context.moveTo(left, c_spacing);
-        context.lineTo(left + width, c_spacing);
-        context.lineTo(left + (width / 2), c_spacing + c_arrowSize);
-        context.lineTo(left, c_spacing);
+        context.moveTo(left, c_spacing + c_topBarSize);
+        context.lineTo(left + width, c_spacing + c_topBarSize);
+        context.lineTo(left + (width / 2), c_spacing + c_arrowSize + c_topBarSize);
+        context.lineTo(left, c_spacing + c_topBarSize);
         context.closePath();
         context.stroke();
         context.fill();
@@ -174,11 +176,11 @@ class GameBoard
         context.fillText("[Z] = Undo", 20, 25);
 
         context.fillStyle = "cyan";
-        context.fillText(this.ownerGame.players[this.ownerGame.matchState.currentPlayerId].name + "'s turn", 300, 16);
+        context.fillText(this.ownerGame.players[this.ownerGame.matchState.currentPlayerId].name + "'s turn", 300, 25);
     }
 
     render(canvas) {
-        canvas.height = ((c_cellSize + c_spacing) * this.numCellsY) + c_spacing + (c_arrowSize + c_spacing);
+        canvas.height = ((c_cellSize + c_spacing) * this.numCellsY) + c_spacing + c_topBarSize + (c_arrowSize + c_spacing);
         canvas.width = ((c_cellSize + c_spacing) * this.numCellsX) + c_spacing;
 
         let context = canvas.getContext('2d');
@@ -205,6 +207,7 @@ class Connect4Game {
         this.settings = settings;
         this.reset();
         this.setupEvents();        
+        this.setupPlayers();
     }
 
     start() {
@@ -217,15 +220,13 @@ class Connect4Game {
     reset() {
         this.board = new GameBoard(this, this.settings.columns || 7, this.settings.rows || 6);
         this.matchState = new MatchState();
-        this.players = [];
         this.state = "none";
         this.winner = null;
-        this.setupPlayers();
     }
 
     setupPlayers() {
         this.players = [];
-        var self = this;
+        let self = this;
 
         this.settings.players.forEach(function(element, index) {
             let newPlayer = new PlayerInfo(index + 1, element.color, element.name || null)
@@ -286,6 +287,7 @@ class Connect4Game {
         context.font = "30px Arial";
         context.fillStyle = "white";
         context.fillText("Press SPACE to play again", 150, (canvas.height - 30));
+        context.fillText("[Scores]", 150, (canvas.height / 2) + 45);
 
         let text = "DRAW";
 
@@ -296,10 +298,18 @@ class Connect4Game {
         }
 
         context.fillText(text, 150, (canvas.height / 2) - 30);
+
+        this.players.forEach(element => {
+            context.fillStyle = element.color;
+            context.font = "24px Arial";
+            context.fillText(element.name + " = " + element.score, 150, (canvas.height / 2) + 45 + (30 * element.playerId));
+        });
     }
 
     sendToResultScreen(winner) {
         this.winner = winner;
+        if (this.winner)
+            this.winner.score++;
         this.state = "result";
         this.render();
     }
